@@ -23,6 +23,21 @@ jac start --dev
 
 Open <http://localhost:8000>.
 
+## Firecrawl-verified web fetches
+
+`web_fetch` actions aren't rated on the agent's self-report alone — `main.jac`
+independently re-fetches the URL via the Firecrawl API (`scrape_url`) and
+re-classifies risk from the real page content, so a manipulated or
+overly-generous self-report can still be caught. Set an API key before
+running the demo:
+
+```bash
+export FIRECRAWL_API_KEY=fc-...
+```
+
+Without it, `web_fetch` actions still log but skip verification (`scrape_url`
+returns a placeholder string instead of calling out to Firecrawl).
+
 ## Where to go next
 
 - **Add a page / routing** — create a `pages/` directory; files become routes

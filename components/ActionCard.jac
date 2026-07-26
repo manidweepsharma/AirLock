@@ -64,7 +64,12 @@ def:pub ActionCard(
     timestamp: str,
     approved: bool,
     override_flag: bool,
-    onApprove: Callable[[str, bool], None]
+    onApprove: Callable[[str, bool], None],
+    url: str = "",
+    verified: bool = False,
+    claimed_risk: str = "",
+    verified_risk: str = "",
+    scraped_excerpt: str = ""
 ) -> JsxElement {
     has approving: bool = False;
 
@@ -91,6 +96,11 @@ def:pub ActionCard(
                         {"APPROVED" if not override_flag else "OVERRIDE"}
                     </Badge>
                 }}
+                {if verified {
+                    <Badge variant="secondary" className="text-xs bg-blue-500/15 text-blue-700 border-blue-500/30">
+                        Verified via Firecrawl
+                    </Badge>
+                }}
             </div>
             <span className="text-xs text-muted-foreground shrink-0 font-mono">{ts_short}</span>
         </div>
@@ -98,6 +108,21 @@ def:pub ActionCard(
         <p className="text-sm text-foreground font-mono bg-muted/50 rounded px-3 py-2 break-all">
             {detail}
         </p>
+
+        {if len(url) > 0 {
+            <p className="text-xs text-muted-foreground font-mono break-all">{url}</p>
+        }}
+
+        {if verified and len(claimed_risk) > 0 and len(verified_risk) > 0 and claimed_risk != verified_risk {
+            <div className="rounded border border-blue-500/30 bg-blue-500/5 px-3 py-2 flex flex-col gap-1">
+                <p className="text-xs font-semibold text-blue-700">
+                    Agent's self-report said {claimed_risk} — Firecrawl's independent re-fetch found {verified_risk}
+                </p>
+                {if len(scraped_excerpt) > 0 {
+                    <p className="text-xs text-muted-foreground font-mono break-all line-clamp-4">{scraped_excerpt}</p>
+                }}
+            </div>
+        }}
 
         {if len(explanation) > 0 {
             <p className="text-xs text-muted-foreground italic">{explanation}</p>

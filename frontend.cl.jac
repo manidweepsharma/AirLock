@@ -182,6 +182,11 @@ def:pub AirlockApp() -> JsxElement {
                                     approved={a["approved"] as bool}
                                     override_flag={a["override"] as bool}
                                     onApprove={handle_approve}
+                                    url={a["url"] as str}
+                                    verified={a["verified"] as bool}
+                                    claimed_risk={a["claimed_risk"] as str}
+                                    verified_risk={a["verified_risk"] as str}
+                                    scraped_excerpt={a["scraped_excerpt"] as str}
                                 />
                             }
                         }}
