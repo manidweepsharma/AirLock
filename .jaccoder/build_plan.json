@@ -1,0 +1,95 @@
+{
+  "schema_version": "1",
+  "ui": {
+    "app_type": "tool",
+    "nav_pattern": "topnav",
+    "pages": [
+      { "name": "ActionFeed", "route": "/", "title": "Airlock — Action Monitor" },
+      { "name": "AuditReport", "route": "/audit", "title": "Airlock — Audit Report" }
+    ],
+    "primitive_components": ["card", "badge", "button", "scroll-area", "separator", "dialog", "spinner", "alert"],
+    "style": "nova",
+    "base_color": "neutral",
+    "theme": "amber",
+    "font": "inter",
+    "radius": "default",
+    "menu_accent": "subtle",
+    "auth_required": false,
+    "backend_required": true,
+    "ai_required": true
+  },
+  "files": [
+    {
+      "path": "services/airlockService.sv.jac",
+      "layer": "service",
+      "purpose": "Defines Action node, FOLLOWS edge, Risk enum, classify_risk LLM function, and walkers log_action, audit_report, and approve.",
+      "exports": ["log_action", "audit_report", "approve", "list_actions"],
+      "imports_from_plan": [],
+      "write_order": 1,
+      "status": "pending"
+    },
+    {
+      "path": "services/demoAgent.sv.jac",
+      "layer": "service",
+      "purpose": "Scripted demo walker that fires a realistic sequence of actions via log_action, ending with a deliberately catastrophic DROP TABLE action.",
+      "exports": ["run_demo"],
+      "imports_from_plan": ["log_action"],
+      "write_order": 2,
+      "status": "pending"
+    },
+    {
+      "path": "components/ActionFeed.cl.jac",
+      "layer": "page",
+      "purpose": "Main monitoring screen: polls list_actions, renders each Action as a color-coded risk card, shows APPROVE / BLOCKED state on dangerous nodes with a human override dialog.",
+      "exports": ["ActionFeed"],
+      "imports_from_plan": ["list_actions", "approve", "run_demo"],
+      "write_order": 3,
+      "status": "pending"
+    },
+    {
+      "path": "components/AuditReport.cl.jac",
+      "layer": "page",
+      "purpose": "Audit report screen: calls audit_report walker and renders the LLM-synthesized plain-language summary of all agent actions.",
+      "exports": ["AuditReport"],
+      "imports_from_plan": ["audit_report"],
+      "write_order": 4,
+      "status": "pending"
+    },
+    {
+      "path": "main.jac",
+      "layer": "shell",
+      "purpose": "App router: imports ActionFeed and AuditReport, declares React Router routes for / and /audit, exports def:pub app().",
+      "exports": ["app"],
+      "imports_from_plan": ["ActionFeed", "AuditReport", "airlockService"],
+      "write_order": 5,
+      "status": "pending"
+    }
+  ],
+  "write_order": [
+    "services/airlockService.sv.jac",
+    "services/demoAgent.sv.jac",
+    "components/ActionFeed.cl.jac",
+    "components/AuditReport.cl.jac",
+    "main.jac"
+  ],
+  "dependency_graph": {
+    "services/demoAgent.sv.jac": ["services/airlockService.sv.jac"],
+    "components/ActionFeed.cl.jac": ["services/airlockService.sv.jac", "services/demoAgent.sv.jac"],
+    "components/AuditReport.cl.jac": ["services/airlockService.sv.jac"],
+    "main.jac": ["components/ActionFeed.cl.jac", "components/AuditReport.cl.jac", "services/airlockService.sv.jac"]
+  },
+  "remove_from_template": ["frontend.cl.jac"],
+  "verify": {
+    "flow": "log_action",
+    "route": "/",
+    "steps": "Click 'Run Demo Agent'; watch the action cards appear with green/yellow/red badges; find the DROP TABLE card showing BLOCKED and click 'Override' to approve it."
+  },
+  "build_log": {
+    "overall_status": "pending",
+    "last_action": "",
+    "issues": [],
+    "learnings": []
+  },
+  "confidence": 0.88,
+  "assumption": "The by llm() classify_risk function and explanation generator will run server-side inside the walkers; the frontend polls list_actions every 2 seconds to simulate streaming."
+}
