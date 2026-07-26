@@ -20,6 +20,7 @@ node Action {
     has timestamp: str = "";
     has approved: bool = False;
     has override: bool = False;
+    has rejected: bool = False;
     has url: str = "";
     has verified: bool = False;
     has claimed_risk: str = "";
@@ -180,6 +181,7 @@ walker:pub log_action {
             "timestamp": new_action.timestamp,
             "approved": new_action.approved,
             "override": new_action.override,
+            "rejected": new_action.rejected,
             "url": new_action.url,
             "verified": new_action.verified,
             "claimed_risk": new_action.claimed_risk,
@@ -230,6 +232,10 @@ walker:pub approve {
             disengage;
         }
         act: Action = target as Action;
+        if act.rejected {
+            report {"approved": False, "risk": act.risk, "error": "Action already rejected"};
+            disengage;
+        }
         if act.risk == "SAFE" {
             act.approved = True;
             report {"approved": True, "risk": act.risk, "override": False};
@@ -240,6 +246,30 @@ walker:pub approve {
         } else {
             report {"approved": False, "risk": act.risk, "blocked": True};
         }
+    }
+}
+
+walker:pub reject {
+    has action_id: str = "";
+
+    can run with Root entry {
+        target: Action | None = None;
+        for a in [root -->[?:Action]] {
+            if jid(a) == self.action_id {
+                target = a;
+            }
+        }
+        if target is None {
+            report {"rejected": False, "error": "Action not found"};
+            disengage;
+        }
+        act: Action = target as Action;
+        if act.approved {
+            report {"rejected": False, "risk": act.risk, "error": "Action already approved"};
+            disengage;
+        }
+        act.rejected = True;
+        report {"rejected": True, "risk": act.risk};
     }
 }
 
@@ -255,6 +285,7 @@ def:pub list_actions() -> list[dict] {
             "timestamp": a.timestamp,
             "approved": a.approved,
             "override": a.override,
+            "rejected": a.rejected,
             "url": a.url,
             "verified": a.verified,
             "claimed_risk": a.claimed_risk,

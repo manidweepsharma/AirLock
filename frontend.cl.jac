@@ -1,13 +1,12 @@
 cl import ".styles.global.css";
 
-sv import from "main" { list_actions, get_audit_summary }
+sv import from "main" { list_actions, get_audit_summary, approve, reject }
 import from ".components.ActionCard" { ActionCard }
 import from ".components.ui.button" { Button }
 import from ".components.ui.badge" { Badge }
 import from ".components.ui.spinner" { Spinner }
 import from ".components.ui.separator" { Separator }
 import from ".components.ui.scroll_area" { ScrollArea }
-import from "@jac/runtime" { jacSpawn }
 
 def:pub AirlockApp() -> JsxElement {
     has actions: list[dict] = [];
@@ -49,11 +48,19 @@ def:pub AirlockApp() -> JsxElement {
 
     async def handle_approve(action_id: str, use_override: bool) -> None {
         try {
-            payload: any = {"action_id": action_id, "human_override": use_override};
-            result: any = await jacSpawn("approve", payload);
+            root spawn approve(action_id=action_id, human_override=use_override);
             await refresh();
         } except Exception as e {
             error_msg = "Approve failed: " + str(e);
+        }
+    }
+
+    async def handle_reject(action_id: str) -> None {
+        try {
+            root spawn reject(action_id=action_id);
+            await refresh();
+        } except Exception as e {
+            error_msg = "Reject failed: " + str(e);
         }
     }
 
@@ -181,7 +188,9 @@ def:pub AirlockApp() -> JsxElement {
                                     timestamp={a["timestamp"] as str}
                                     approved={a["approved"] as bool}
                                     override_flag={a["override"] as bool}
+                                    rejected={a["rejected"] as bool}
                                     onApprove={handle_approve}
+                                    onReject={handle_reject}
                                     url={a["url"] as str}
                                     verified={a["verified"] as bool}
                                     claimed_risk={a["claimed_risk"] as str}

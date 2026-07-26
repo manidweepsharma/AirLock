@@ -65,6 +65,8 @@ def:pub ActionCard(
     approved: bool,
     override_flag: bool,
     onApprove: Callable[[str, bool], None],
+    rejected: bool = False,
+    onReject: Callable[[str], None] | None = None,
     url: str = "",
     verified: bool = False,
     claimed_risk: str = "",
@@ -72,11 +74,20 @@ def:pub ActionCard(
     scraped_excerpt: str = ""
 ) -> JsxElement {
     has approving: bool = False;
+    has rejecting: bool = False;
 
     async def handle_approve(use_override: bool) -> None {
         approving = True;
         onApprove(action_id, use_override);
         approving = False;
+    }
+
+    async def handle_reject() -> None {
+        rejecting = True;
+        if onReject {
+            onReject(action_id);
+        }
+        rejecting = False;
     }
 
     ts_short: str = timestamp[:19] if len(timestamp) >= 19 else timestamp;
@@ -94,6 +105,11 @@ def:pub ActionCard(
                 {if approved {
                     <Badge variant="secondary" className={cn("text-xs", "bg-green-500/15 text-green-700 border-green-500/30" if not override_flag else "bg-orange-500/15 text-orange-700 border-orange-500/30")}>
                         {"APPROVED" if not override_flag else "OVERRIDE"}
+                    </Badge>
+                }}
+                {if rejected {
+                    <Badge variant="secondary" className="text-xs bg-red-500/15 text-red-700 border-red-500/30">
+                        REJECTED
                     </Badge>
                 }}
                 {if verified {
@@ -128,11 +144,19 @@ def:pub ActionCard(
             <p className="text-xs text-muted-foreground italic">{explanation}</p>
         }}
 
-        {if risk == "DANGEROUS" and not approved {
+        {if risk == "DANGEROUS" and not approved and not rejected {
             <div className="flex items-center gap-2 pt-1 border-t border-border">
                 <div className="flex-1">
                     <p className="text-xs font-semibold text-destructive">Action blocked — human review required</p>
                 </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={lambda (e: MouseEvent) { handle_reject(); }}
+                    disabled={rejecting}
+                >
+                    {"Rejecting..." if rejecting else "Reject"}
+                </Button>
                 <Button
                     variant="destructive"
                     size="sm"
@@ -143,11 +167,19 @@ def:pub ActionCard(
                 </Button>
             </div>
         }}
-        {if risk == "REVIEW" and not approved {
+        {if risk == "REVIEW" and not approved and not rejected {
             <div className="flex items-center gap-2 pt-1 border-t border-border">
                 <div className="flex-1">
                     <p className="text-xs font-semibold text-yellow-600">Needs review before proceeding</p>
                 </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={lambda (e: MouseEvent) { handle_reject(); }}
+                    disabled={rejecting}
+                >
+                    {"Rejecting..." if rejecting else "Reject"}
+                </Button>
                 <Button
                     variant="outline"
                     size="sm"
