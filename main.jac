@@ -21,6 +21,7 @@ node Action {
     has approved: bool = False;
     has override: bool = False;
     has rejected: bool = False;
+    has reviewer: str = "";
     has url: str = "";
     has verified: bool = False;
     has claimed_risk: str = "";
@@ -127,6 +128,75 @@ def get_latest_action() -> Action | None {
     return latest;
 }
 
+# ─── Shared ingestion logic ─────────────────────────────────────────────────
+# Both the log_action endpoint and the in-UI demo trigger (run_demo) need the
+# exact same create+classify+verify+auto-approve pipeline, so it lives here
+# once rather than being duplicated.
+
+def _record_action(action_type: str, detail: str, url: str = "") -> dict {
+    ts: str = datetime.now().isoformat();
+    new_action: Action = Action(
+        action_type=action_type,
+        detail=detail,
+        timestamp=ts,
+        url=url
+    );
+    root ++> new_action;
+
+    # Link to previous action via FOLLOWS edge
+    prev: Action | None = get_latest_action();
+    if prev is not None and jid(prev) != jid(new_action) {
+        prev +>:FOLLOWS():+> new_action;
+    }
+
+    # Baseline classification from the agent's self-reported description
+    claimed: Risk = classify_risk(action_type, detail);
+    new_action.claimed_risk = claimed.value;
+    new_action.risk = claimed.value;
+    new_action.explanation = explain_action(action_type, detail, claimed.value);
+
+    # Ground-truth verification for web_fetch actions via Firecrawl:
+    # re-fetch the real page instead of trusting the agent's claim.
+    if action_type == "web_fetch" and len(url) > 0 {
+        scraped: str = scrape_url(url);
+        new_action.verified = True;
+        new_action.scraped_excerpt = scraped[:400] if len(scraped) > 400 else scraped;
+
+        verified: Risk = classify_scraped_risk(detail, scraped);
+        new_action.verified_risk = verified.value;
+
+        if risk_severity(verified.value) > risk_severity(claimed.value) {
+            new_action.risk = verified.value;
+            new_action.explanation = explain_scraped_risk(detail, scraped, verified.value);
+        }
+    }
+
+    # Only auto-approve once the risk is final (post-verification) -- a
+    # web_fetch claimed SAFE but escalated by Firecrawl must still land
+    # in the review queue, not skip it.
+    if new_action.risk == "SAFE" {
+        new_action.approved = True;
+    }
+
+    return {
+        "id": jid(new_action),
+        "action_type": new_action.action_type,
+        "detail": new_action.detail,
+        "risk": new_action.risk,
+        "explanation": new_action.explanation,
+        "timestamp": new_action.timestamp,
+        "approved": new_action.approved,
+        "override": new_action.override,
+        "rejected": new_action.rejected,
+        "reviewer": new_action.reviewer,
+        "url": new_action.url,
+        "verified": new_action.verified,
+        "claimed_risk": new_action.claimed_risk,
+        "verified_risk": new_action.verified_risk,
+        "scraped_excerpt": new_action.scraped_excerpt
+    };
+}
+
 # ─── Walkers ────────────────────────────────────────────────────────────────
 
 walker:pub log_action {
@@ -135,67 +205,38 @@ walker:pub log_action {
     has url: str = "";
 
     can run with Root entry {
-        ts: str = datetime.now().isoformat();
-        new_action: Action = Action(
-            action_type=self.action_type,
-            detail=self.detail,
-            timestamp=ts,
-            url=self.url
-        );
-        root ++> new_action;
-
-        # Link to previous action via FOLLOWS edge
-        prev: Action | None = get_latest_action();
-        if prev is not None and jid(prev) != jid(new_action) {
-            prev +>:FOLLOWS():+> new_action;
-        }
-
-        # Baseline classification from the agent's self-reported description
-        claimed: Risk = classify_risk(self.action_type, self.detail);
-        new_action.claimed_risk = claimed.value;
-        new_action.risk = claimed.value;
-        new_action.explanation = explain_action(self.action_type, self.detail, claimed.value);
-
-        # Ground-truth verification for web_fetch actions via Firecrawl:
-        # re-fetch the real page instead of trusting the agent's claim.
-        if self.action_type == "web_fetch" and len(self.url) > 0 {
-            scraped: str = scrape_url(self.url);
-            new_action.verified = True;
-            new_action.scraped_excerpt = scraped[:400] if len(scraped) > 400 else scraped;
-
-            verified: Risk = classify_scraped_risk(self.detail, scraped);
-            new_action.verified_risk = verified.value;
-
-            if risk_severity(verified.value) > risk_severity(claimed.value) {
-                new_action.risk = verified.value;
-                new_action.explanation = explain_scraped_risk(self.detail, scraped, verified.value);
-            }
-        }
-
-        # Only auto-approve once the risk is final (post-verification) -- a
-        # web_fetch claimed SAFE but escalated by Firecrawl must still land
-        # in the review queue, not skip it.
-        if new_action.risk == "SAFE" {
-            new_action.approved = True;
-        }
-
-        report {
-            "id": jid(new_action),
-            "action_type": new_action.action_type,
-            "detail": new_action.detail,
-            "risk": new_action.risk,
-            "explanation": new_action.explanation,
-            "timestamp": new_action.timestamp,
-            "approved": new_action.approved,
-            "override": new_action.override,
-            "rejected": new_action.rejected,
-            "url": new_action.url,
-            "verified": new_action.verified,
-            "claimed_risk": new_action.claimed_risk,
-            "verified_risk": new_action.verified_risk,
-            "scraped_excerpt": new_action.scraped_excerpt
-        };
+        report _record_action(self.action_type, self.detail, self.url);
     }
+}
+
+def:pub run_demo() -> list[dict] {
+    results: list[dict] = [];
+    results.append(_record_action(
+        "file_edit",
+        "Read /etc/app/config.yaml to check database connection settings"
+    ));
+    results.append(_record_action(
+        "file_edit",
+        "Edit /etc/app/config.yaml: change log_level from 'info' to 'debug' for troubleshooting"
+    ));
+    results.append(_record_action(
+        "db_mutation",
+        "Run migration 0042_add_user_preferences_table.sql: CREATE TABLE user_preferences (id SERIAL PRIMARY KEY, user_id INT REFERENCES users(id), key VARCHAR(255), value TEXT)"
+    ));
+    results.append(_record_action(
+        "api_call",
+        "POST https://api.stripe.com/v1/charges with amount=9900, currency=usd, customer=cus_abc123 — charging customer for subscription renewal"
+    ));
+    results.append(_record_action(
+        "db_mutation",
+        "DROP TABLE users; -- removing legacy user table as part of cleanup"
+    ));
+    results.append(_record_action(
+        "web_fetch",
+        "Skimmed a linked Wikipedia article on query syntax for background — routine reading, doesn't touch our systems",
+        "https://en.wikipedia.org/wiki/SQL_injection"
+    ));
+    return results;
 }
 
 walker:pub audit_report {
@@ -226,6 +267,7 @@ walker:pub audit_report {
 walker:pub approve {
     has action_id: str = "";
     has human_override: bool = False;
+    has reviewer: str = "";
 
     can run with Root entry {
         target: Action | None = None;
@@ -245,11 +287,13 @@ walker:pub approve {
         }
         if act.risk == "SAFE" {
             act.approved = True;
-            report {"approved": True, "risk": act.risk, "override": False};
+            act.reviewer = self.reviewer;
+            report {"approved": True, "risk": act.risk, "override": False, "reviewer": act.reviewer};
         } elif self.human_override {
             act.approved = True;
             act.override = True;
-            report {"approved": True, "risk": act.risk, "override": True};
+            act.reviewer = self.reviewer;
+            report {"approved": True, "risk": act.risk, "override": True, "reviewer": act.reviewer};
         } else {
             report {"approved": False, "risk": act.risk, "blocked": True};
         }
@@ -258,6 +302,7 @@ walker:pub approve {
 
 walker:pub reject {
     has action_id: str = "";
+    has reviewer: str = "";
 
     can run with Root entry {
         target: Action | None = None;
@@ -276,7 +321,8 @@ walker:pub reject {
             disengage;
         }
         act.rejected = True;
-        report {"rejected": True, "risk": act.risk};
+        act.reviewer = self.reviewer;
+        report {"rejected": True, "risk": act.risk, "reviewer": act.reviewer};
     }
 }
 
@@ -293,6 +339,7 @@ def:pub list_actions() -> list[dict] {
             "approved": a.approved,
             "override": a.override,
             "rejected": a.rejected,
+            "reviewer": a.reviewer,
             "url": a.url,
             "verified": a.verified,
             "claimed_risk": a.claimed_risk,
@@ -319,8 +366,7 @@ def:pub get_audit_summary() -> dict {
 # ─── Client entry ────────────────────────────────────────────────────────────
 
 cl import ".styles.global.css";
-cl import from ".frontend" { AirlockApp }
 
-def:pub app() -> JsxElement {
-    return <AirlockApp />;
+def:pub app(children: any) -> JsxElement {
+    return <>{children}</>;
 }

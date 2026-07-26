@@ -67,6 +67,7 @@ def:pub ActionCard(
     onApprove: Callable[[str, bool], None],
     rejected: bool = False,
     onReject: Callable[[str], None] | None = None,
+    reviewer: str = "",
     url: str = "",
     verified: bool = False,
     claimed_risk: str = "",
@@ -91,6 +92,9 @@ def:pub ActionCard(
     }
 
     ts_short: str = timestamp[:19] if len(timestamp) >= 19 else timestamp;
+    reviewer_suffix: str = (" by " + reviewer) if len(reviewer) > 0 else "";
+    approved_label: str = ("APPROVED" if not override_flag else "OVERRIDE") + reviewer_suffix;
+    rejected_label: str = "REJECTED" + reviewer_suffix;
 
     return <div className={cn("rounded-lg border bg-card p-4 flex flex-col gap-3 transition-all", risk_border(risk))}>
         <div className="flex items-start justify-between gap-3">
@@ -104,12 +108,12 @@ def:pub ActionCard(
                 </Badge>
                 {if approved {
                     <Badge variant="secondary" className={cn("text-xs", "bg-green-500/15 text-green-700 border-green-500/30" if not override_flag else "bg-orange-500/15 text-orange-700 border-orange-500/30")}>
-                        {"APPROVED" if not override_flag else "OVERRIDE"}
+                        {approved_label}
                     </Badge>
                 }}
                 {if rejected {
                     <Badge variant="secondary" className="text-xs bg-red-500/15 text-red-700 border-red-500/30">
-                        REJECTED
+                        {rejected_label}
                     </Badge>
                 }}
                 {if verified {
