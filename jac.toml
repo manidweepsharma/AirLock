@@ -8,8 +8,8 @@ jac-version = "==0.34.7"
 
 [byllm]
 [byllm.model]
-default_model = "${LLM_MODEL:-gpt-4o-mini}"
-api_key = "${OPENAI_API_KEY:-}"
+default_model = "${LLM_MODEL:-claude-sonnet-5}"
+api_key = "${ANTHROPIC_API_KEY:-}"
 
 
 [jac-shadcn]
