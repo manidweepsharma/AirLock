@@ -1,351 +1,200 @@
-"""The build splash — what the preview shows before the app exists.
-
-Two states:
-
-  * No prompt (created from the template gallery) -> the sparkles message.
-  * With a prompt -> the JacBuilder splash: the user's own words echoed back,
-    plus a wireframe skeleton of the KIND of app they asked for.
-
-`BUILD_PROMPT` is a sentinel the IDE rewrites at create time
-(`project_manager._apply_build_prompt_to_template`). It finds this file by
-name and that string by value -- do not rename either.
-
-The skeleton is a guess keyed off words in the prompt. That is deliberate: a
-shimmer reads as "loading", never as a promise, so a rough shape costs
-nothing when it is wrong and orients the user when it is right. Prompts that
-match nothing fall back to a neutral app shell.
-
-The whole splash disappears the moment JacCoder rewrites this file. Keep it
-that way -- a skeleton that outlives the real UI is worse than no skeleton.
-
-Two client-Jac constraints shaped this file, both worth knowing before you
-edit it:
-  * `.map(...)` over a literal list trips the checker ("list has no attribute
-    map"), so repeated bars are written out longhand.
-  * Use Python string methods (`.lower()`, `x in y`), not the JS ones --
-    `.toLowerCase()` / `.indexOf()` do not type-check.
-"""
-
 cl import ".styles.global.css";
-cl import from ".components.ui.skeleton" { Skeleton }
 
-glob BUILD_PROMPT: str = "__JAC_BUILDER_BUILD_PROMPT__";
+sv import from "main" { list_actions, get_audit_summary }
+import from ".components.ActionCard" { ActionCard }
+import from ".components.ui.button" { Button }
+import from ".components.ui.badge" { Badge }
+import from ".components.ui.spinner" { Spinner }
+import from ".components.ui.separator" { Separator }
+import from ".components.ui.scroll_area" { ScrollArea }
+import from "@jac/runtime" { jacSpawn }
 
-# keyword -> layout, first match wins.
-glob _HINTS: list[list[str]] = [
-    ["dashboard", "dashboard"], ["admin", "dashboard"], ["analytics", "dashboard"],
-    ["metrics", "dashboard"], ["chart", "dashboard"], ["crm", "dashboard"],
-    ["tracker", "dashboard"], ["report", "dashboard"],
-    ["landing", "landing"], ["marketing", "landing"], ["waitlist", "landing"],
-    ["saas", "landing"], ["homepage", "landing"], ["portfolio", "landing"],
-    ["pricing", "landing"],
-    ["chat", "chat"], ["assistant", "chat"], ["messaging", "chat"],
-    ["inbox", "chat"], ["bot", "chat"],
-    ["shop", "shop"], ["store", "shop"], ["ecommerce", "shop"],
-    ["commerce", "shop"], ["product", "shop"], ["cart", "shop"],
-    ["blog", "blog"], ["docs", "blog"], ["article", "blog"],
-    ["news", "blog"], ["documentation", "blog"]
-];
+def:pub AirlockApp() -> JsxElement {
+    has actions: list[dict] = [];
+    has loading: bool = True;
+    has audit_summary: str = "";
+    has audit_loading: bool = False;
+    has error_msg: str = "";
+    has safe_count: int = 0;
+    has review_count: int = 0;
+    has dangerous_count: int = 0;
+    has polling: bool = True;
 
-glob _PANEL: str = "rounded-xl border border-border bg-card";
+    async can with entry {
+        loading = True;
+        try {
+            data: list[dict] = await list_actions();
+            actions = data;
+            safe_count = len([a for a in data if a["risk"] == "SAFE"]);
+            review_count = len([a for a in data if a["risk"] == "REVIEW"]);
+            dangerous_count = len([a for a in data if a["risk"] == "DANGEROUS"]);
+        } except Exception as e {
+            error_msg = "Failed to load actions: " + str(e);
+        }
+        loading = False;
+    }
 
-
-cl def:pub DashboardSkeleton() -> JsxElement {
-    return <div className="flex w-full gap-4">
-        <div className={"hidden md:flex w-44 shrink-0 flex-col gap-3 self-stretch pt-5 pb-5 pl-4 pr-4 " + _PANEL}>
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-2/3" />
-        </div>
-        <div className="flex flex-1 flex-col gap-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className={"flex flex-col gap-3 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-7 w-14" />
-                </div>
-                <div className={"flex flex-col gap-3 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-7 w-14" />
-                </div>
-                <div className={"flex flex-col gap-3 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-7 w-14" />
-                </div>
-            </div>
-            <div className={"flex h-56 items-end gap-2 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                <Skeleton className="h-2/5 flex-1" />
-                <Skeleton className="h-3/4 flex-1" />
-                <Skeleton className="h-1/2 flex-1" />
-                <Skeleton className="h-5/6 flex-1" />
-                <Skeleton className="h-1/3 flex-1" />
-                <Skeleton className="h-2/3 flex-1" />
-                <Skeleton className="h-3/4 flex-1" />
-            </div>
-            <div className={"flex flex-col gap-3 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                <div className="flex items-center gap-4">
-                    <Skeleton className="h-3.5 w-32" />
-                    <Skeleton className="ml-auto h-3.5 w-20" />
-                    <Skeleton className="h-3.5 w-16" />
-                </div>
-                <div className="flex items-center gap-4">
-                    <Skeleton className="h-3.5 w-40" />
-                    <Skeleton className="ml-auto h-3.5 w-20" />
-                    <Skeleton className="h-3.5 w-16" />
-                </div>
-                <div className="flex items-center gap-4">
-                    <Skeleton className="h-3.5 w-28" />
-                    <Skeleton className="ml-auto h-3.5 w-20" />
-                    <Skeleton className="h-3.5 w-16" />
-                </div>
-                <div className="flex items-center gap-4">
-                    <Skeleton className="h-3.5 w-36" />
-                    <Skeleton className="ml-auto h-3.5 w-20" />
-                    <Skeleton className="h-3.5 w-16" />
-                </div>
-                <div className="flex items-center gap-4">
-                    <Skeleton className="h-3.5 w-24" />
-                    <Skeleton className="ml-auto h-3.5 w-20" />
-                    <Skeleton className="h-3.5 w-16" />
-                </div>
-            </div>
-        </div>
-    </div>;
-}
-
-
-cl def:pub LandingSkeleton() -> JsxElement {
-    return <div className="flex w-full flex-col gap-5">
-        <div className={"flex items-center gap-4 pt-3 pb-3 pl-4 pr-4 " + _PANEL}>
-            <Skeleton className="h-5 w-24" />
-            <div className="ml-auto flex gap-3">
-                <Skeleton className="h-3.5 w-14" />
-                <Skeleton className="h-3.5 w-14" />
-                <Skeleton className="h-3.5 w-14" />
-            </div>
-        </div>
-        <div className="flex flex-col items-center gap-4 pt-8 pb-8">
-            <Skeleton className="h-9 w-3/4 max-w-lg" />
-            <Skeleton className="h-9 w-1/2 max-w-sm" />
-            <Skeleton className="mt-2 h-4 w-2/3 max-w-md" />
-            <div className="mt-3 flex gap-3">
-                <Skeleton className="h-10 w-32 rounded-lg bg-primary/25" />
-                <Skeleton className="h-10 w-28 rounded-lg" />
-            </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className={"flex flex-col gap-3 pt-5 pb-5 pl-4 pr-4 " + _PANEL}>
-                <Skeleton className="size-9 rounded-lg bg-primary/20" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-full" />
-            </div>
-            <div className={"flex flex-col gap-3 pt-5 pb-5 pl-4 pr-4 " + _PANEL}>
-                <Skeleton className="size-9 rounded-lg bg-primary/20" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-full" />
-            </div>
-            <div className={"flex flex-col gap-3 pt-5 pb-5 pl-4 pr-4 " + _PANEL}>
-                <Skeleton className="size-9 rounded-lg bg-primary/20" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-full" />
-            </div>
-        </div>
-    </div>;
-}
-
-
-cl def:pub ChatSkeleton() -> JsxElement {
-    return <div className={"flex w-full flex-col gap-4 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-        <div className="flex items-center gap-3">
-            <Skeleton className="size-9 rounded-full" />
-            <Skeleton className="h-4 w-28" />
-        </div>
-        <div className="flex flex-col gap-3">
-            <Skeleton className="h-12 w-3/5 rounded-2xl" />
-            <Skeleton className="h-14 w-2/3 self-end rounded-2xl bg-primary/20" />
-            <Skeleton className="h-16 w-3/4 rounded-2xl" />
-            <Skeleton className="h-10 w-1/2 self-end rounded-2xl bg-primary/20" />
-        </div>
-        <div className={"mt-auto flex items-center gap-3 pt-3 pb-3 pl-4 pr-4 " + _PANEL}>
-            <Skeleton className="h-4 flex-1" />
-            <Skeleton className="size-8 rounded-lg bg-primary/25" />
-        </div>
-    </div>;
-}
-
-
-cl def:pub ShopSkeleton() -> JsxElement {
-    return <div className="flex w-full flex-col gap-5">
-        <div className={"flex items-center gap-4 pt-3 pb-3 pl-4 pr-4 " + _PANEL}>
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="ml-auto h-8 w-40 rounded-lg" />
-        </div>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-            <div className={"flex flex-col gap-3 pt-3 pb-3 pl-3 pr-3 " + _PANEL}>
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3.5 w-1/3" />
-            </div>
-            <div className={"flex flex-col gap-3 pt-3 pb-3 pl-3 pr-3 " + _PANEL}>
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3.5 w-1/3" />
-            </div>
-            <div className={"flex flex-col gap-3 pt-3 pb-3 pl-3 pr-3 " + _PANEL}>
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3.5 w-1/3" />
-            </div>
-            <div className={"flex flex-col gap-3 pt-3 pb-3 pl-3 pr-3 " + _PANEL}>
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3.5 w-1/3" />
-            </div>
-            <div className={"flex flex-col gap-3 pt-3 pb-3 pl-3 pr-3 " + _PANEL}>
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3.5 w-1/3" />
-            </div>
-            <div className={"flex flex-col gap-3 pt-3 pb-3 pl-3 pr-3 " + _PANEL}>
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3.5 w-1/3" />
-            </div>
-        </div>
-    </div>;
-}
-
-
-cl def:pub BlogSkeleton() -> JsxElement {
-    return <div className="flex w-full gap-5">
-        <div className="flex flex-1 flex-col gap-4">
-            <div className={"flex gap-4 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                <Skeleton className="size-16 shrink-0" />
-                <div className="flex flex-1 flex-col gap-2.5">
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-1/2" />
-                </div>
-            </div>
-            <div className={"flex gap-4 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                <Skeleton className="size-16 shrink-0" />
-                <div className="flex flex-1 flex-col gap-2.5">
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-1/2" />
-                </div>
-            </div>
-            <div className={"flex gap-4 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                <Skeleton className="size-16 shrink-0" />
-                <div className="flex flex-1 flex-col gap-2.5">
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-1/2" />
-                </div>
-            </div>
-            <div className={"flex gap-4 pt-4 pb-4 pl-4 pr-4 " + _PANEL}>
-                <Skeleton className="size-16 shrink-0" />
-                <div className="flex flex-1 flex-col gap-2.5">
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-1/2" />
-                </div>
-            </div>
-        </div>
-        <div className={"hidden lg:flex w-52 shrink-0 flex-col gap-3 pt-5 pb-5 pl-4 pr-4 " + _PANEL}>
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-2/3" />
-        </div>
-    </div>;
-}
-
-
-cl def:pub AppSkeleton() -> JsxElement {
-    return <div className="flex w-full flex-col gap-5">
-        <div className={"flex items-center gap-4 pt-3 pb-3 pl-4 pr-4 " + _PANEL}>
-            <Skeleton className="size-7 rounded-lg bg-primary/25" />
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="ml-auto size-8 rounded-full" />
-        </div>
-        <div className={"flex flex-col gap-4 pt-6 pb-6 pl-6 pr-6 " + _PANEL}>
-            <Skeleton className="h-6 w-1/3" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-2/3" />
-            <div className="mt-2 flex gap-3">
-                <Skeleton className="h-9 w-28 rounded-lg bg-primary/25" />
-                <Skeleton className="h-9 w-24 rounded-lg" />
-            </div>
-        </div>
-    </div>;
-}
-
-
-cl def:pub app() -> JsxElement {
-    sentinel = "__JAC_BUILDER" + "_BUILD_PROMPT__";
-    hasPrompt = BUILD_PROMPT != sentinel;
-
-    layout = "app";
-    low = BUILD_PROMPT.lower();
-    for pair in _HINTS {
-        if layout == "app" and pair[0] in low {
-            layout = pair[1];
+    async def refresh() -> None {
+        try {
+            data: list[dict] = await list_actions();
+            actions = data;
+            safe_count = len([a for a in data if a["risk"] == "SAFE"]);
+            review_count = len([a for a in data if a["risk"] == "REVIEW"]);
+            dangerous_count = len([a for a in data if a["risk"] == "DANGEROUS"]);
+            error_msg = "";
+        } except Exception as e {
+            error_msg = "Refresh failed: " + str(e);
         }
     }
 
-    skeleton = <AppSkeleton />;
-    if layout == "dashboard" {
-        skeleton = <DashboardSkeleton />;
-    } elif layout == "landing" {
-        skeleton = <LandingSkeleton />;
-    } elif layout == "chat" {
-        skeleton = <ChatSkeleton />;
-    } elif layout == "shop" {
-        skeleton = <ShopSkeleton />;
-    } elif layout == "blog" {
-        skeleton = <BlogSkeleton />;
+    async def handle_approve(action_id: str, use_override: bool) -> None {
+        try {
+            payload: any = {"action_id": action_id, "human_override": use_override};
+            result: any = await jacSpawn("approve", payload);
+            await refresh();
+        } except Exception as e {
+            error_msg = "Approve failed: " + str(e);
+        }
     }
 
-    if not hasPrompt {
-        return <div className="flex min-h-screen w-full items-center justify-center bg-background pt-8 pb-8 pl-8 pr-8 text-foreground">
-            <div className="flex max-w-2xl flex-col items-center gap-6 text-center">
-                <div className="select-none text-7xl" role="img" aria-label="sparkles">
-                    {"✨"}
+    async def load_audit() -> None {
+        audit_loading = True;
+        try {
+            result: dict = await get_audit_summary();
+            audit_summary = result["summary"] as str;
+        } except Exception as e {
+            audit_summary = "Failed to load audit: " + str(e);
+        }
+        audit_loading = False;
+    }
+
+    return <div className="min-h-screen bg-background text-foreground">
+        {#* Header *#}
+        <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-lg bg-destructive flex items-center justify-center">
+                        <span className="text-destructive-foreground text-xs font-bold">AL</span>
+                    </div>
+                    <div>
+                        <h1 className="text-base font-bold tracking-tight">Airlock</h1>
+                        <p className="text-xs text-muted-foreground">AI Agent Safety Sandbox</p>
+                    </div>
                 </div>
-                <p className="text-2xl font-medium leading-snug text-foreground sm:text-3xl">
-                    {"When you start to build, changes will appear here."}
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={lambda (e: MouseEvent) { refresh(); }}>
+                        Refresh
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={lambda (e: MouseEvent) { load_audit(); }}>
+                        Audit Report
+                    </Button>
+                </div>
+            </div>
+        </header>
+
+        <main className="max-w-5xl mx-auto px-4 py-6 flex flex-col gap-6">
+
+            {#* Stats bar *#}
+            <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-3 flex flex-col gap-1">
+                    <span className="text-2xl font-bold text-green-600">{str(safe_count)}</span>
+                    <span className="text-xs text-muted-foreground font-medium">Safe Actions</span>
+                </div>
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 flex flex-col gap-1">
+                    <span className="text-2xl font-bold text-yellow-600">{str(review_count)}</span>
+                    <span className="text-xs text-muted-foreground font-medium">Needs Review</span>
+                </div>
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex flex-col gap-1">
+                    <span className="text-2xl font-bold text-destructive">{str(dangerous_count)}</span>
+                    <span className="text-xs text-muted-foreground font-medium">Dangerous</span>
+                </div>
+            </div>
+
+            {#* Audit summary *#}
+            {if len(audit_summary) > 0 {
+                <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">Audit Summary</span>
+                        {if audit_loading {
+                            <Spinner className="size-3" />
+                        }}
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{audit_summary}</p>
+                </div>
+            }}
+            {if audit_loading and len(audit_summary) == 0 {
+                <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
+                    <Spinner className="size-4" />
+                    <span className="text-sm text-muted-foreground">Generating audit report...</span>
+                </div>
+            }}
+
+            {#* Error *#}
+            {if len(error_msg) > 0 {
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                    <p className="text-sm text-destructive">{error_msg}</p>
+                </div>
+            }}
+
+            {#* Action feed *#}
+            <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                        {"Action Feed — " + str(len(actions)) + " recorded"}
+                    </h2>
+                </div>
+
+                {if loading {
+                    <div className="flex items-center justify-center py-16">
+                        <div className="flex flex-col items-center gap-3">
+                            <Spinner className="size-6" />
+                            <p className="text-sm text-muted-foreground">Loading actions...</p>
+                        </div>
+                    </div>
+                }}
+
+                {if not loading and len(actions) == 0 {
+                    <div className="rounded-lg border border-dashed border-border p-12 flex flex-col items-center gap-3 text-center">
+                        <div className="size-12 rounded-full bg-muted flex items-center justify-center">
+                            <span className="text-muted-foreground text-lg font-bold">0</span>
+                        </div>
+                        <p className="text-sm font-medium">No actions recorded yet</p>
+                        <p className="text-xs text-muted-foreground max-w-xs">
+                            Run the demo agent to see actions stream in with real-time risk classification.
+                        </p>
+                        <div className="mt-2 rounded bg-muted px-3 py-2 font-mono text-xs text-muted-foreground">
+                            jac run demo_agent.jac
+                        </div>
+                    </div>
+                }}
+
+                {if not loading and len(actions) > 0 {
+                    <div className="flex flex-col gap-3">
+                        {for a in actions {
+                            if a is not None {
+                                <ActionCard
+                                    action_id={a["id"] as str}
+                                    action_type={a["action_type"] as str}
+                                    detail={a["detail"] as str}
+                                    risk={a["risk"] as str}
+                                    explanation={a["explanation"] as str}
+                                    timestamp={a["timestamp"] as str}
+                                    approved={a["approved"] as bool}
+                                    override_flag={a["override"] as bool}
+                                    onApprove={handle_approve}
+                                />
+                            }
+                        }}
+                    </div>
+                }}
+            </div>
+
+            {#* Footer *#}
+            <div className="pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground text-center">
+                    Airlock — JacHacks SF 2026 — Built with Jac graph + walker + byLLM
                 </p>
             </div>
-        </div>;
-    }
-
-    return <div className="flex min-h-screen w-full flex-col gap-6 bg-background pt-8 pb-8 pl-6 pr-6 text-foreground sm:pl-8 sm:pr-8">
-        <div className="flex w-full flex-col gap-4">
-            <div className="flex items-center gap-2.5">
-                <span className="inline-block size-2 animate-pulse rounded-full bg-primary" />
-                <span className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-                    {"jac builder"}
-                </span>
-            </div>
-            <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-                {"Cooking your app"}
-                <span className="animate-pulse text-primary">{"…"}</span>
-            </h1>
-            <blockquote className="line-clamp-3 max-h-24 w-full max-w-3xl overflow-hidden border-l-2 border-primary/40 pt-1 pb-1 pl-4 text-base italic text-muted-foreground">
-                {BUILD_PROMPT}
-            </blockquote>
-        </div>
-
-        <div className="flex w-full flex-1 items-start opacity-80" aria-hidden="true">
-            {skeleton}
-        </div>
-
-        <p className="w-full text-xs leading-relaxed tracking-wide text-muted-foreground/70">
-            {"Hang tight — JacCoder is wiring this up. The preview refreshes the moment files land."}
-        </p>
+        </main>
     </div>;
 }

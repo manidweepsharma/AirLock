@@ -4,10 +4,27 @@
     "app_type": "tool",
     "nav_pattern": "topnav",
     "pages": [
-      { "name": "ActionFeed", "route": "/", "title": "Airlock — Action Monitor" },
-      { "name": "AuditReport", "route": "/audit", "title": "Airlock — Audit Report" }
+      {
+        "name": "ActionFeed",
+        "route": "/",
+        "title": "Airlock \u2014 Action Monitor"
+      },
+      {
+        "name": "AuditReport",
+        "route": "/audit",
+        "title": "Airlock \u2014 Audit Report"
+      }
     ],
-    "primitive_components": ["card", "badge", "button", "scroll-area", "separator", "dialog", "spinner", "alert"],
+    "primitive_components": [
+      "card",
+      "badge",
+      "button",
+      "scroll-area",
+      "separator",
+      "dialog",
+      "spinner",
+      "alert"
+    ],
     "style": "nova",
     "base_color": "neutral",
     "theme": "amber",
@@ -23,7 +40,12 @@
       "path": "services/airlockService.sv.jac",
       "layer": "service",
       "purpose": "Defines Action node, FOLLOWS edge, Risk enum, classify_risk LLM function, and walkers log_action, audit_report, and approve.",
-      "exports": ["log_action", "audit_report", "approve", "list_actions"],
+      "exports": [
+        "log_action",
+        "audit_report",
+        "approve",
+        "list_actions"
+      ],
       "imports_from_plan": [],
       "write_order": 1,
       "status": "pending"
@@ -32,8 +54,12 @@
       "path": "services/demoAgent.sv.jac",
       "layer": "service",
       "purpose": "Scripted demo walker that fires a realistic sequence of actions via log_action, ending with a deliberately catastrophic DROP TABLE action.",
-      "exports": ["run_demo"],
-      "imports_from_plan": ["log_action"],
+      "exports": [
+        "run_demo"
+      ],
+      "imports_from_plan": [
+        "log_action"
+      ],
       "write_order": 2,
       "status": "pending"
     },
@@ -41,8 +67,14 @@
       "path": "components/ActionFeed.cl.jac",
       "layer": "page",
       "purpose": "Main monitoring screen: polls list_actions, renders each Action as a color-coded risk card, shows APPROVE / BLOCKED state on dangerous nodes with a human override dialog.",
-      "exports": ["ActionFeed"],
-      "imports_from_plan": ["list_actions", "approve", "run_demo"],
+      "exports": [
+        "ActionFeed"
+      ],
+      "imports_from_plan": [
+        "list_actions",
+        "approve",
+        "run_demo"
+      ],
       "write_order": 3,
       "status": "pending"
     },
@@ -50,8 +82,12 @@
       "path": "components/AuditReport.cl.jac",
       "layer": "page",
       "purpose": "Audit report screen: calls audit_report walker and renders the LLM-synthesized plain-language summary of all agent actions.",
-      "exports": ["AuditReport"],
-      "imports_from_plan": ["audit_report"],
+      "exports": [
+        "AuditReport"
+      ],
+      "imports_from_plan": [
+        "audit_report"
+      ],
       "write_order": 4,
       "status": "pending"
     },
@@ -59,10 +95,16 @@
       "path": "main.jac",
       "layer": "shell",
       "purpose": "App router: imports ActionFeed and AuditReport, declares React Router routes for / and /audit, exports def:pub app().",
-      "exports": ["app"],
-      "imports_from_plan": ["ActionFeed", "AuditReport", "airlockService"],
+      "exports": [
+        "app"
+      ],
+      "imports_from_plan": [
+        "ActionFeed",
+        "AuditReport",
+        "airlockService"
+      ],
       "write_order": 5,
-      "status": "pending"
+      "status": "done"
     }
   ],
   "write_order": [
@@ -73,12 +115,25 @@
     "main.jac"
   ],
   "dependency_graph": {
-    "services/demoAgent.sv.jac": ["services/airlockService.sv.jac"],
-    "components/ActionFeed.cl.jac": ["services/airlockService.sv.jac", "services/demoAgent.sv.jac"],
-    "components/AuditReport.cl.jac": ["services/airlockService.sv.jac"],
-    "main.jac": ["components/ActionFeed.cl.jac", "components/AuditReport.cl.jac", "services/airlockService.sv.jac"]
+    "services/demoAgent.sv.jac": [
+      "services/airlockService.sv.jac"
+    ],
+    "components/ActionFeed.cl.jac": [
+      "services/airlockService.sv.jac",
+      "services/demoAgent.sv.jac"
+    ],
+    "components/AuditReport.cl.jac": [
+      "services/airlockService.sv.jac"
+    ],
+    "main.jac": [
+      "components/ActionFeed.cl.jac",
+      "components/AuditReport.cl.jac",
+      "services/airlockService.sv.jac"
+    ]
   },
-  "remove_from_template": ["frontend.cl.jac"],
+  "remove_from_template": [
+    "frontend.cl.jac"
+  ],
   "verify": {
     "flow": "log_action",
     "route": "/",

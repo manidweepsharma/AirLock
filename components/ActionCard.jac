@@ -1,0 +1,149 @@
+import from ".ui.card" { Card, CardHeader, CardTitle, CardContent }
+import from ".ui.badge" { Badge }
+import from ".ui.button" { Button }
+import from "..lib.utils" { cn }
+
+def risk_variant(risk: str) -> str {
+    if risk == "DANGEROUS" {
+        return "destructive";
+    }
+    if risk == "REVIEW" {
+        return "outline";
+    }
+    return "secondary";
+}
+
+def risk_label(risk: str) -> str {
+    if risk == "DANGEROUS" {
+        return "DANGEROUS";
+    }
+    if risk == "REVIEW" {
+        return "REVIEW";
+    }
+    if risk == "SAFE" {
+        return "SAFE";
+    }
+    return "UNRATED";
+}
+
+def risk_border(risk: str) -> str {
+    if risk == "DANGEROUS" {
+        return "border-l-4 border-l-destructive bg-destructive/5";
+    }
+    if risk == "REVIEW" {
+        return "border-l-4 border-l-yellow-500 bg-yellow-500/5";
+    }
+    if risk == "SAFE" {
+        return "border-l-4 border-l-green-500 bg-green-500/5";
+    }
+    return "border-l-4 border-l-muted";
+}
+
+def type_icon(action_type: str) -> str {
+    if action_type == "file_edit" {
+        return "FILE";
+    }
+    if action_type == "shell_cmd" {
+        return "SHELL";
+    }
+    if action_type == "db_mutation" {
+        return "DB";
+    }
+    if action_type == "api_call" {
+        return "API";
+    }
+    return "ACT";
+}
+
+def:pub ActionCard(
+    action_id: str,
+    action_type: str,
+    detail: str,
+    risk: str,
+    explanation: str,
+    timestamp: str,
+    approved: bool,
+    override_flag: bool,
+    onApprove: Callable[[str, bool], None]
+) -> JsxElement {
+    has approving: bool = False;
+
+    async def handle_approve(use_override: bool) -> None {
+        approving = True;
+        onApprove(action_id, use_override);
+        approving = False;
+    }
+
+    ts_short: str = timestamp[:19] if len(timestamp) >= 19 else timestamp;
+
+    return <div className={cn("rounded-lg border bg-card p-4 flex flex-col gap-3 transition-all", risk_border(risk))}>
+        <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-mono font-semibold bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                    {type_icon(action_type)}
+                </span>
+                <span className="text-sm font-medium text-foreground">{action_type}</span>
+                <Badge variant={risk_variant(risk)}>
+                    {risk_label(risk)}
+                </Badge>
+                {if approved {
+                    <Badge variant="secondary" className={cn("text-xs", "bg-green-500/15 text-green-700 border-green-500/30" if not override_flag else "bg-orange-500/15 text-orange-700 border-orange-500/30")}>
+                        {"APPROVED" if not override_flag else "OVERRIDE"}
+                    </Badge>
+                }}
+            </div>
+            <span className="text-xs text-muted-foreground shrink-0 font-mono">{ts_short}</span>
+        </div>
+
+        <p className="text-sm text-foreground font-mono bg-muted/50 rounded px-3 py-2 break-all">
+            {detail}
+        </p>
+
+        {if len(explanation) > 0 {
+            <p className="text-xs text-muted-foreground italic">{explanation}</p>
+        }}
+
+        {if risk == "DANGEROUS" and not approved {
+            <div className="flex items-center gap-2 pt-1 border-t border-border">
+                <div className="flex-1">
+                    <p className="text-xs font-semibold text-destructive">Action blocked — human review required</p>
+                </div>
+                <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={lambda (e: MouseEvent) { handle_approve(True); }}
+                    disabled={approving}
+                >
+                    {"Overriding..." if approving else "Override + Approve"}
+                </Button>
+            </div>
+        }}
+        {if risk == "REVIEW" and not approved {
+            <div className="flex items-center gap-2 pt-1 border-t border-border">
+                <div className="flex-1">
+                    <p className="text-xs font-semibold text-yellow-600">Needs review before proceeding</p>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={lambda (e: MouseEvent) { handle_approve(True); }}
+                    disabled={approving}
+                >
+                    {"Approving..." if approving else "Approve"}
+                </Button>
+            </div>
+        }}
+        {if risk == "SAFE" and not approved {
+            <div className="flex items-center gap-2 pt-1 border-t border-border">
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={lambda (e: MouseEvent) { handle_approve(False); }}
+                    disabled={approving}
+                >
+                    {"Approving..." if approving else "Approve"}
+                </Button>
+            </div>
+        }}
+    </div>;
+}
