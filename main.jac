@@ -172,6 +172,13 @@ walker:pub log_action {
             }
         }
 
+        # Only auto-approve once the risk is final (post-verification) -- a
+        # web_fetch claimed SAFE but escalated by Firecrawl must still land
+        # in the review queue, not skip it.
+        if new_action.risk == "SAFE" {
+            new_action.approved = True;
+        }
+
         report {
             "id": jid(new_action),
             "action_type": new_action.action_type,
